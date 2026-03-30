@@ -1,1 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Detail Finder</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #2b2738; color: white; display: flex; justify-content: center; padding: 20px; }
+        .card { background: #1e1b26; padding: 30px; border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #3e3a4e; }
+        h1 { font-size: 22px; margin-bottom: 25px; color: #ffffff; text-align: center; border-bottom: 1px solid #3e3a4e; padding-bottom: 15px; }
+        
+        .group { margin-bottom: 18px; }
+        label { display: block; font-size: 13px; color: #b1afb9; margin-bottom: 6px; }
+        select, input { width: 100%; padding: 13px; border-radius: 8px; border: 1px solid #3e3a4e; background: #2b2738; color: white; box-sizing: border-box; font-size: 15px; }
+        
+        /* Highlight the auto-filled area */
+        #area { background-color: #252131; border-color: #7c5dfa; color: #9277ff; font-weight: bold; }
 
+        .btn { width: 100%; padding: 16px; background: #7c5dfa; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 16px; transition: 0.3s; }
+        .btn:hover { background: #9277ff; }
+        
+        #result { margin-top: 30px; padding: 25px; background: #252131; border-radius: 12px; border: 2px solid #7c5dfa; display: none; text-align: center; animation: fadeIn 0.5s; }
+        
+        .res-label { color: #b1afb9; font-size: 13px; margin-top: 10px; }
+        .res-value { font-size: 17px; font-weight: 600; color: #ffffff; margin-bottom: 5px; }
+        
+        /* Big Price Font */
+        .price-tag { font-size: 42px; color: #ffffff; font-weight: 900; margin: 15px 0; text-shadow: 0 0 10px rgba(124, 93, 250, 0.5); }
+        
+        .rent-status { font-size: 15px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #3e3a4e; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Property Details</h1>
+        
+        <div class="group">
+            <label>Location</label>
+            <select id="loc" onchange="loadBuildings(this.value)">
+                <option value="">Select Location</option>
+                {% for l in locations %}
+                <option value="{{ l }}">{{ l }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="group">
+            <label>Building Name</label>
+            <select id="bld" disabled onchange="loadBHKs(this.value)">
+                <option value="">Select location first</option>
+            </select>
+        </div>
+
+        <div style="display: flex; gap: 15px;">
+            <div class="group" style="flex: 1;">
+                <label>Type (BHK)</label>
+                <select id="bhk" disabled onchange="autoFillArea(this.value)">
+                    <option value="">Select building</option>
+                </select>
+            </div>
+            <div class="group" style="flex: 1;">
+                <label>Area (Sqft)</label>
+                <input type="text" id="area" readonly placeholder="---">
+            </div>
+        </div>
+
+        <button class="btn" onclick="showFinalDetails()">View Property Value</button>
+
+        <div id="result">
+            <div class="res-label">Building & Location</div>
+            <div class="res-value" id="res_title">---</div>
+            
+            <div class="res-label">Property Type</div>
+            <div class="res-value" id="res_type">---</div>
+
+            <div class="res-label">Market Price</div>
+            <div class="price-tag" id="res_price">₹ 0</div>
+            
+            <div class="rent-status" id="res_rent"></div>
+        </div>
+    </div>
+
+    <script>
+        let bhkDataList = [];
+
+        function loadBuildings(loc) {
+            const bld = document.getElementById('bld');
+            document.getElementById('result').style.display = 'none';
+            fetch('/get_buildings/' + encodeURIComponent(loc))
+            .then(res => res.json())
+            .then(data => {
+                bld.innerHTML = '<option value="">Select Building</option>';
+                data.forEach(b => bld.innerHTML += `<option value="${b}">${b}</option>`);
+                bld.disabled = false;
+            });
+        }
+
+        function loadBHKs(building) {
+            const loc = document.getElementById('loc').value;
+            const bhkDrop = document.getElementById('bhk');
+            fetch(`/get_bhk_details/${encodeURIComponent(loc)}/${encodeURIComponent(building)}`)
+            .then(res => res.json())
+            .then(data => {
+                bhkDataList = data;
+                bhkDrop.innerHTML = '<option value="">Select BHK</option>';
+                data.forEach(item => bhkDrop.innerHTML += `<option value="${item.BHK}">${item.BHK} BHK</option>`);
+                bhkDrop.disabled = false;
+            });
+        }
+
+        function autoFillArea(selectedBhk) {
+            const match = bhkDataList.find(i => i.BHK == selectedBhk);
+            if(match) {
+                document.getElementById('area').value = match.Carpet_Area + " Sqft";
+            }
+        }
+
+        function showFinalDetails() {
+            const bhkVal = document.getElementById('bhk').value;
+            const buildingVal = document.getElementById('bld').value;
+            const locationVal = document.getElementById('loc').value;
+            const match = bhkDataList.find(i => i.BHK == bhkVal);
+            
+            if(!match) {
+                alert("Please select all options!");
+                return;
+            }
+
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('res_title').innerText = `${buildingVal}, ${locationVal}`;
+            document.getElementById('res_type').innerText = `${bhkVal} BHK (${match.Carpet_Area} Sqft)`;
+            document.getElementById('res_price').innerText = "₹ " + parseFloat(match.Price).toLocaleString();
+            
+            const rent = parseFloat(match.Rented_Price);
+            if(rent > 0) {
+                document.getElementById('res_rent').innerHTML = `Available for Rent: <b style="color:#9277ff">Yes (₹${rent.toLocaleString()})</b>`;
+            } else {
+                document.getElementById('res_rent').innerHTML = `Available for Rent: <b style="color:#ff5f5f">No</b>`;
+            }
+        }
+    </script>
+</body>
+</html>
